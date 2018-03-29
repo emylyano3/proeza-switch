@@ -41,13 +41,16 @@ Channel channels[] = {
   {"", D0, 0, D4, STATE_OFF}
 };
 const uint8_t MAX_CHANNELS = 3;
-#else
+#elif ESP12
 Channel channels[] = {
   {"", 13, 0, 5, STATE_OFF},
   {"", 12, 0, 4, STATE_OFF},
   {"", 16, 0, 2, STATE_OFF}
 };
 const uint8_t MAX_CHANNELS = 3;
+#else
+Channel channels[] = {{"", 16, 0, 2, STATE_OFF}};
+const uint8_t MAX_CHANNELS = 1;
 #endif
 
 WiFiClient espClient;
