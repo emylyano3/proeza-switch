@@ -40,12 +40,14 @@ Channel channels[] = {
   {"", D6, 0, D2, STATE_OFF},
   {"", D0, 0, D4, STATE_OFF}
 };
+const uint8_t MAX_CHANNELS = 3;
 #else
 Channel channels[] = {
   {"", 13, 0, 5, STATE_OFF},
   {"", 12, 0, 4, STATE_OFF},
   {"", 16, 0, 2, STATE_OFF}
 };
+const uint8_t MAX_CHANNELS = 3;
 #endif
 
 WiFiClient espClient;
@@ -356,20 +358,21 @@ void connectBroker() {
     log(F("Connecting MQTT broker as"), getStationName());
     if (mqttClient.connect(getStationName())) {
       log(F("Connected"));
-      log("suscribing station", (String(MODULE_TYPE) + F("/") + moduleLocation.getValue() + F("/") + moduleName.getValue() + F("/#")).c_str());
-      delay(2000);
-      mqttClient.subscribe(getStationTopic("#").c_str());
+      subscribeTopic(getStationTopic("#").c_str());
       for (size_t i = 0; i < MAX_CHANNELS; ++i) {
         if (isChannelEnabled(&channels[i])) {
-          log("subscribing channel", getChannelTopic(&channels[i], "cmd").c_str());
-          delay(2000);
-          mqttClient.subscribe(getChannelTopic(&channels[i], "cmd").c_str());
+          subscribeTopic(getChannelTopic(&channels[i], "cmd").c_str());
         }
       }
     }
   } else {
     log(F("Failed. RC:"), mqttClient.state());
   }
+}
+
+void subscribeTopic(const char *t) {
+  log("Subscribing mqtt topic", t);
+  mqttClient.subscribe(t);
 }
 
 String getChannelTopic (Channel *c, String cmd) {
