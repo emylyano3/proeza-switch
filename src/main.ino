@@ -27,31 +27,12 @@ const String MODULE_TYPE  = "ligthSwitchStation";
 const String CHANNEL_TYPE = "lightSwitch";
 
 struct Channel {
-  String name;
+  WiFiManagerParameter *param;
   uint8_t switchPin;
   int switchState;
   uint8_t relayPin;
   char relayState;
 };
-
-#ifdef NODEMCUV2
-Channel channels[] = {
-  {"", D7, 0, D1, STATE_OFF},
-  {"", D6, 0, D2, STATE_OFF},
-  {"", D0, 0, D4, STATE_OFF}
-};
-const uint8_t MAX_CHANNELS = 3;
-#elif ESP12
-Channel channels[] = {
-  {"", 13, 0, 5, STATE_OFF},
-  {"", 12, 0, 4, STATE_OFF},
-  {"", 16, 0, 2, STATE_OFF}
-};
-const uint8_t MAX_CHANNELS = 3;
-#else
-Channel channels[] = {{"", 16, 0, 2, STATE_OFF}};
-const uint8_t MAX_CHANNELS = 1;
-#endif
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
@@ -62,9 +43,34 @@ WiFiManagerParameter mqttServer("mqttServer", "MQTT Server", "192.168.0.105", 16
 WiFiManagerParameter mqttPort("mqttPort", "MQTT Port", "1883", 6);
 WiFiManagerParameter moduleLocation("moduleLocation", "Module location", "room", PARAM_LENGTH);
 WiFiManagerParameter moduleName("moduleName", "Module name", "ceiling", PARAM_LENGTH);
+#ifndef ESP01
 WiFiManagerParameter ch_A_name("ch_A_name", "Channel A name", "ch_A", PARAM_LENGTH);
 WiFiManagerParameter ch_B_name("ch_B_name", "Channel B name", "ch_B", PARAM_LENGTH);
 WiFiManagerParameter ch_C_name("ch_C_name", "Channel C name", "ch_C", PARAM_LENGTH);
+#else
+WiFiManagerParameter ch_name("ch_name", "Channel name", "channel", PARAM_LENGTH);
+#endif
+
+#ifdef ESP01
+Channel channels[] = {
+  {&ch_name, 16, 0, 2, STATE_OFF}
+};
+const uint8_t MAX_CHANNELS = 1;
+#elif NODEMCUV2
+Channel channels[] = {
+  {&ch_A_name, D7, 0, D1, STATE_OFF},
+  {&ch_B_name, D6, 0, D2, STATE_OFF},
+  {&ch_C_name, D0, 0, D4, STATE_OFF}
+};
+const uint8_t MAX_CHANNELS = 3;
+#else
+Channel channels[] = {
+  {&ch_A_name, 13, 0, 5, STATE_OFF},
+  {&ch_B_name, 12, 0, 4, STATE_OFF},
+  {&ch_C_name, 16, 0, 2, STATE_OFF}
+};
+const uint8_t MAX_CHANNELS = 3;
+#endif
 
 long nextBrokerConnAtte = 0;
 
@@ -113,9 +119,9 @@ void setup() {
   wifiManager.addParameter(&mqttPort);
   wifiManager.addParameter(&moduleLocation);
   wifiManager.addParameter(&moduleName);
-  wifiManager.addParameter(&ch_A_name);
-  wifiManager.addParameter(&ch_B_name);
-  wifiManager.addParameter(&ch_C_name);
+  for (uint8_t i = 0; i < MAX_CHANNELS; ++i) {
+    wifiManager.addParameter(channels[i].param);
+  }
 
   if (!wifiManager.autoConnect(("ESP_" + String(ESP.getChipId())).c_str(), "12345678")) {
     log(F("Failed to connect and hit timeout"));
@@ -131,17 +137,6 @@ void setup() {
   log(F("Server"), mqttServer.getValue());
   mqttClient.setServer(mqttServer.getValue(), (uint16_t) port.toInt());
   mqttClient.setCallback(receiveMqttMessage);
-
-  // Set channels
-  if (ch_A_name.getValueLength() > 0) {
-    channels[0].name = ch_A_name.getValue();
-  }
-  if (ch_B_name.getValueLength() > 0) {
-    channels[1].name = ch_B_name.getValue();
-  }
-  if (ch_C_name.getValueLength() > 0) {
-    channels[2].name = ch_C_name.getValue();
-  }
 
   // OTA Update Stuff
   WiFi.mode(WIFI_STA);
@@ -174,9 +169,9 @@ bool loadConfig() {
             mqttPort.update(json[mqttPort.getID()]);
             moduleName.update(json[moduleName.getID()]);
             moduleLocation.update(json[moduleLocation.getID()]);
-            ch_A_name.update(json[ch_A_name.getID()]);
-            ch_B_name.update(json[ch_B_name.getID()]);
-            ch_C_name.update(json[ch_C_name.getID()]);
+            for (uint8_t i = 0; i < MAX_CHANNELS; ++i) {
+              channels[i].param->update(json[channels[i].param->getID()]);
+            }
             return true;
           } else {
             log(F("Failed to load json config"));
@@ -208,19 +203,14 @@ void saveConfigCallback () {
     json[mqttPort.getID()] = mqttPort.getValue();
     json[moduleName.getID()] = moduleName.getValue();
     json[moduleLocation.getID()] = moduleLocation.getValue();
-    json[ch_A_name.getID()] = ch_A_name.getValue();
-    json[ch_B_name.getID()] = ch_B_name.getValue();
-    json[ch_C_name.getID()] = ch_C_name.getValue();
+    for (uint8_t i = 0; i < MAX_CHANNELS; ++i) {
+      json[channels[i].param->getID()] = channels[i].param->getValue();
+    }
     json.printTo(configFile);
   } else {
     log(F("Failed to open config file for writing"));
   }
   configFile.close();
-}
-
-String* trimParamValue(String *p) {
-  p->trim();
-  return p;
 }
 
 void loop() {
@@ -310,7 +300,7 @@ void processPhysicalInput() {
 void processChannelInput(Channel *c) {
   int read = digitalRead(c->switchPin);
   if (read != c->switchState) {
-    log(F("Phisical switch state has changed. Updating module"), c->name);
+    log(F("Phisical switch state has changed. Updating module"), c->param->getValue());
     c->switchState = read;
     flipRelayState(c);
     publishState(c);
@@ -318,14 +308,14 @@ void processChannelInput(Channel *c) {
 }
 
 bool isChannelEnabled (Channel *c) {
-  return c->name.length() > 0;
+  return c->param->getValueLength() > 0;
 }
 
 void setRelayState (Channel *c, char newState) {
   if (c->relayState != newState) {
     flipRelayState(c);
   } else {
-    log("Same state to channel, no update done", c->name);
+    log("Same state to channel, no update done", c->param->getValue());
   }
 }
 
@@ -341,7 +331,7 @@ void flipRelayState (Channel *c) {
     default:
       break;
   }
-  log(F("Channel updated"), c->name);
+  log(F("Channel updated"), c->param->getValue());
   log(F("State changed to"), c->relayState);
 }
 
@@ -379,7 +369,7 @@ void subscribeTopic(const char *t) {
 }
 
 String getChannelTopic (Channel *c, String cmd) {
-  return CHANNEL_TYPE + F("/") + String(moduleLocation.getValue()) + F("/") + c->name + F("/") + cmd;
+  return CHANNEL_TYPE + F("/") + moduleLocation.getValue() + F("/") + c->param->getValue() + F("/") + cmd;
 }
 
 String getStationTopic (String cmd) {
