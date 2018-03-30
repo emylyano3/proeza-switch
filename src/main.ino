@@ -13,18 +13,18 @@
 
 #include <PubSubClient.h>
 
+#ifndef ESP01
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson
 #include <ESP8266mDNS.h>
-
-#define PARAM_LENGTH 15
+#endif
 
 const char* CONFIG_FILE   = "/config.json";
 
 /* Possible switch states */
 const char STATE_OFF      = '0';
 const char STATE_ON       = '1';
-const String MODULE_TYPE  = "ligthSwitchStation";
-const String CHANNEL_TYPE = "lightSwitch";
+const String MODULE_TYPE  = "ligthStation";
+const String CHANNEL_TYPE = "light";
 
 struct Channel {
   WiFiManagerParameter *param;
@@ -47,27 +47,26 @@ WiFiManagerParameter moduleName("moduleName", "Module name", "ceiling", PARAM_LE
 WiFiManagerParameter ch_A_name("ch_A_name", "Channel A name", "ch_A", PARAM_LENGTH);
 WiFiManagerParameter ch_B_name("ch_B_name", "Channel B name", "ch_B", PARAM_LENGTH);
 WiFiManagerParameter ch_C_name("ch_C_name", "Channel C name", "ch_C", PARAM_LENGTH);
-#else
-WiFiManagerParameter ch_name("ch_name", "Channel name", "channel", PARAM_LENGTH);
-#endif
+#endif 
 
 #ifdef ESP01
 Channel channels[] = {
-  {&ch_name, 16, 0, 2, STATE_OFF}
+  {&moduleName, 3, LOW, 2, STATE_OFF}
 };
 const uint8_t MAX_CHANNELS = 1;
+const uint8_t TX_PIN        = 1;
 #elif NODEMCUV2
 Channel channels[] = {
-  {&ch_A_name, D7, 0, D1, STATE_OFF},
-  {&ch_B_name, D6, 0, D2, STATE_OFF},
-  {&ch_C_name, D0, 0, D4, STATE_OFF}
+  {&ch_A_name, D7, LOW, D1, STATE_OFF},
+  {&ch_B_name, D6, LOW, D2, STATE_OFF},
+  {&ch_C_name, D0, LOW, D4, STATE_OFF}
 };
 const uint8_t MAX_CHANNELS = 3;
 #else
 Channel channels[] = {
-  {&ch_A_name, 13, 0, 5, STATE_OFF},
-  {&ch_B_name, 12, 0, 4, STATE_OFF},
-  {&ch_C_name, 16, 0, 2, STATE_OFF}
+  {&ch_A_name, 13, LOW, 5, STATE_OFF},
+  {&ch_B_name, 12, LOW, 4, STATE_OFF},
+  {&ch_C_name, 16, LOW, 2, STATE_OFF}
 };
 const uint8_t MAX_CHANNELS = 3;
 #endif
@@ -91,7 +90,12 @@ template <class T, class U> void log (T key, U value) {
 }
 
 void setup() {
+#ifdef ESP01
+  //to avoid using pin 0 as input
+  Serial.begin(115200, SERIAL_8N1, SERIAL_TX_ONLY, TX_PIN);
+#else
   Serial.begin(115200);
+#endif
   delay(500);
   Serial.println();
   log("Starting module");
@@ -119,10 +123,11 @@ void setup() {
   wifiManager.addParameter(&mqttPort);
   wifiManager.addParameter(&moduleLocation);
   wifiManager.addParameter(&moduleName);
+#ifndef ESP01
   for (uint8_t i = 0; i < MAX_CHANNELS; ++i) {
     wifiManager.addParameter(channels[i].param);
   }
-
+#endif
   if (!wifiManager.autoConnect(("ESP_" + String(ESP.getChipId())).c_str(), "12345678")) {
     log(F("Failed to connect and hit timeout"));
     delay(3000);
@@ -140,8 +145,10 @@ void setup() {
 
   // OTA Update Stuff
   WiFi.mode(WIFI_STA);
+#ifndef ESP01
   MDNS.begin(getStationName());
   MDNS.addService("http", "tcp", 80);
+#endif
   httpUpdater.setup(&httpServer);
   httpServer.begin();
   Serial.print(F("HTTPUpdateServer ready! Open http://"));
@@ -158,6 +165,7 @@ bool loadConfig() {
       if (configFile) {
         size_t size = configFile.size();
         if (size > 0) {
+        #ifndef ESP01
           // Allocate a buffer to store contents of the file.
           char buf[size];
           configFile.readBytes(buf, size);
@@ -176,6 +184,33 @@ bool loadConfig() {
           } else {
             log(F("Failed to load json config"));
           }
+        #else
+          while (configFile.position() < size) {
+            String line = configFile.readStringUntil('\n');
+            line.trim();
+            uint16_t ioc = line.indexOf('=');
+            if (ioc >= 0 && ioc + 1 < line.length()) {
+              String key = line.substring(0, ioc++);
+              log("Read key", key);
+              String val = line.substring(ioc, line.length());
+              log("Key value", val);
+              if (key.equals(mqttPort.getID())) {
+                mqttPort.update(val.c_str());
+              } else if (key.equals(mqttServer.getID())) {
+                mqttServer.update(val.c_str());
+              } else if (key.equals(moduleLocation.getID())) {
+                moduleLocation.update(val.c_str());
+              } else if (key.equals(moduleName.getID())) {
+                moduleName.update(val.c_str());
+              } else {
+                log("ERROR. Unknown key");
+              }
+            } else {
+              log("Config bad format", line);
+            }
+          }
+          return true;
+        #endif
         } else {
           log(F("Config file empty"));
         }
@@ -196,6 +231,7 @@ bool loadConfig() {
 void saveConfigCallback () {
   File configFile = SPIFFS.open(CONFIG_FILE, "w");
   if (configFile) {
+  #ifndef ESP01
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.createObject();
     //TODO Trim param values
@@ -207,6 +243,14 @@ void saveConfigCallback () {
       json[channels[i].param->getID()] = channels[i].param->getValue();
     }
     json.printTo(configFile);
+  #else
+    String line = String(mqttServer.getID()) + "=" + String(mqttServer.getValue());
+    configFile.println(line);
+    line = String(mqttPort.getID()) + "=" + String(mqttPort.getValue());
+    configFile.println(line);
+    line = String(moduleName.getID()) + "=" + String(moduleName.getValue());
+    configFile.println(line);
+  #endif
   } else {
     log(F("Failed to open config file for writing"));
   }
@@ -223,7 +267,7 @@ void loop() {
 }
 
 void receiveMqttMessage(char* topic, unsigned char* payload, unsigned int length) {
-  log(F("mqtt message"), topic);
+  log(F("Received mqtt message topic"), topic);
   for (size_t i = 0; i < MAX_CHANNELS; ++i) {
     if (isChannelEnabled(&channels[i])) {
       if (getChannelTopic(&channels[i], "cmd").equals(topic)) {
@@ -232,12 +276,8 @@ void receiveMqttMessage(char* topic, unsigned char* payload, unsigned int length
       }
     }
   }
-  if (String(topic).equals(getStationTopic("rst"))) {
-     reset();
-  } else if (String(topic).equals(getStationTopic("hrst"))) {
+  if (String(topic).equals(getStationTopic("hrst"))) {
     hardReset();
-  } else if (String(topic).equals(getStationTopic("rtt"))) {
-    restart();
   } else {
     log(F("Unknown topic"));
   }
@@ -246,22 +286,10 @@ void receiveMqttMessage(char* topic, unsigned char* payload, unsigned int length
 void hardReset () {
   log(F("Doing a module hard reset"));
   SPIFFS.format();
-  delay(200);
-  reset();
-}
-
-void reset () {
-  log(F("Reseting module configuration"));
   WiFiManager wifiManager;
   wifiManager.resetSettings();
   delay(200);
-  restart();
-}
-
-void restart () {
-  log(F("Restarting module"));
   ESP.restart();
-  delay(2000);
 }
 
 void publishState (Channel *c) {
