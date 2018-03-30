@@ -53,22 +53,22 @@ WiFiManagerParameter ch_C_name("ch_C_name", "Channel C name", "ch_C", PARAM_LENG
 Channel channels[] = {
   {&moduleName, 3, LOW, 2, STATE_OFF}
 };
-const uint8_t MAX_CHANNELS = 1;
-const uint8_t TX_PIN        = 1;
+const uint8_t CHANNELS_COUNT  = 1;
+const uint8_t TX_PIN          = 1;
 #elif NODEMCUV2
 Channel channels[] = {
   {&ch_A_name, D7, LOW, D1, STATE_OFF},
   {&ch_B_name, D6, LOW, D2, STATE_OFF},
   {&ch_C_name, D0, LOW, D4, STATE_OFF}
 };
-const uint8_t MAX_CHANNELS = 3;
+const uint8_t CHANNELS_COUNT = 3;
 #else
 Channel channels[] = {
   {&ch_A_name, 13, LOW, 5, STATE_OFF},
   {&ch_B_name, 12, LOW, 4, STATE_OFF},
   {&ch_C_name, 16, LOW, 2, STATE_OFF}
 };
-const uint8_t MAX_CHANNELS = 3;
+const uint8_t CHANNELS_COUNT = 3;
 #endif
 
 long nextBrokerConnAtte = 0;
@@ -102,7 +102,7 @@ void setup() {
   bool existConfig = loadConfig();
     
   // pins settings
-  for (size_t i = 0; i < MAX_CHANNELS; ++i) {
+  for (size_t i = 0; i < CHANNELS_COUNT; ++i) {
     pinMode(channels[i].relayPin, OUTPUT);
     pinMode(channels[i].switchPin, INPUT);
     digitalWrite(channels[i].switchPin, HIGH);
@@ -124,7 +124,7 @@ void setup() {
   wifiManager.addParameter(&moduleLocation);
   wifiManager.addParameter(&moduleName);
 #ifndef ESP01
-  for (uint8_t i = 0; i < MAX_CHANNELS; ++i) {
+  for (uint8_t i = 0; i < CHANNELS_COUNT; ++i) {
     wifiManager.addParameter(channels[i].param);
   }
 #endif
@@ -177,7 +177,7 @@ bool loadConfig() {
             mqttPort.update(json[mqttPort.getID()]);
             moduleName.update(json[moduleName.getID()]);
             moduleLocation.update(json[moduleLocation.getID()]);
-            for (uint8_t i = 0; i < MAX_CHANNELS; ++i) {
+            for (uint8_t i = 0; i < CHANNELS_COUNT; ++i) {
               channels[i].param->update(json[channels[i].param->getID()]);
             }
             return true;
@@ -185,6 +185,7 @@ bool loadConfig() {
             log(F("Failed to load json config"));
           }
         #else
+          // Avoid using json to reduce build size
           while (configFile.position() < size) {
             String line = configFile.readStringUntil('\n');
             line.trim();
@@ -239,7 +240,7 @@ void saveConfigCallback () {
     json[mqttPort.getID()] = mqttPort.getValue();
     json[moduleName.getID()] = moduleName.getValue();
     json[moduleLocation.getID()] = moduleLocation.getValue();
-    for (uint8_t i = 0; i < MAX_CHANNELS; ++i) {
+    for (uint8_t i = 0; i < CHANNELS_COUNT; ++i) {
       json[channels[i].param->getID()] = channels[i].param->getValue();
     }
     json.printTo(configFile);
@@ -268,7 +269,7 @@ void loop() {
 
 void receiveMqttMessage(char* topic, unsigned char* payload, unsigned int length) {
   log(F("Received mqtt message topic"), topic);
-  for (size_t i = 0; i < MAX_CHANNELS; ++i) {
+  for (size_t i = 0; i < CHANNELS_COUNT; ++i) {
     if (isChannelEnabled(&channels[i])) {
       if (getChannelTopic(&channels[i], "cmd").equals(topic)) {
         processCommand(&channels[i], payload, length);
@@ -318,7 +319,7 @@ void processCommand (Channel *c, unsigned char* payload, unsigned int length) {
 }
 
 void processPhysicalInput() {
-  for (size_t i = 0; i < MAX_CHANNELS; ++i) {
+  for (size_t i = 0; i < CHANNELS_COUNT; ++i) {
     if (isChannelEnabled(&channels[i])) {
       processChannelInput(&channels[i]);
     }
@@ -380,7 +381,7 @@ void connectBroker() {
     if (mqttClient.connect(getStationName())) {
       log(F("Connected"));
       subscribeTopic(getStationTopic("#").c_str());
-      for (size_t i = 0; i < MAX_CHANNELS; ++i) {
+      for (size_t i = 0; i < CHANNELS_COUNT; ++i) {
         if (isChannelEnabled(&channels[i])) {
           subscribeTopic(getChannelTopic(&channels[i], "cmd").c_str());
         }
