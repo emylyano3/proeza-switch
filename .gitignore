@@ -5,3 +5,8 @@
 .vscode/launch.json
 .vscode/*.db
 .vscode/.browse.c_cpp.db*
+__Previews
+History
+Project Logs*
+Project Outputs*
+*.log
