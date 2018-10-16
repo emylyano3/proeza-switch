@@ -1,19 +1,21 @@
-#include <FS.h>
 #include <ESPDomotic.h>
 
 #ifdef ESP01
-Channel _switch ("A", "Switch", 3, INPUT, HIGH, -1);
-Channel _relay ("B", "Relay", 2, OUTPUT, HIGH, -1);
+const uint8_t SWITCH_PIN  = 3;
+const uint8_t RELAY_PIN   = 2;
 const uint8_t TX_PIN      = 1;
 #elif NODEMCUV2
-Channel _switch ("A", "Switch", D1, INPUT, HIGH, -1);
-Channel _relay ("B", "Relay", D2, OUTPUT, HIGH, -1);
+const uint8_t SWITCH_PIN  = D1;
+const uint8_t RELAY_PIN   = D2;
 const uint8_t LED_PIN     = D3;
 #else
-Channel _switch ("A", "Switch", 1, INPUT, HIGH, -1);
-Channel _relay ("B", "Relay", 2, OUTPUT, HIGH, -1);
+const uint8_t SWITCH_PIN  = 1;
+const uint8_t RELAY_PIN   = 2;
 const uint8_t LED_PIN     = 3;
 #endif
+
+Channel _switch ("A", "Switch", SWITCH_PIN, INPUT, HIGH, -1);
+Channel _relay ("B", "Relay", RELAY_PIN, OUTPUT, HIGH, -1);
 
 template <class T> void log (T text) {
   #ifdef LOGGING
