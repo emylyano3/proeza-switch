@@ -7,7 +7,7 @@ const uint8_t RELAY_PIN   = 2;
 const uint8_t TX_PIN      = 1;
 #elif NODEMCUV2
 // usable pins D0,D1,D2,D5,D6,D7 (D10 is TX (GPIO1), D9 is RX (GPIO3), D3 is GPIO0, D4 is GPIO2, D8 is GPIO15)
-const uint8_t SWITCH_PIN  = D0;
+const uint8_t SWITCH_PIN  = D5;
 const uint8_t RELAY_PIN   = D1;
 const uint8_t LED_PIN     = D7;
 #else
@@ -17,7 +17,7 @@ const uint8_t RELAY_PIN   = 5;
 const uint8_t LED_PIN     = 12;
 #endif
 
-Channel _switch ("A", "Switch", SWITCH_PIN, INPUT, HIGH, -1);
+Channel _switch ("A", "Switch", SWITCH_PIN, INPUT, LOW, -1);
 Channel _relay ("B", "Relay", RELAY_PIN, OUTPUT, HIGH, -1);
 
 template <class T> void log (T text) {
@@ -36,7 +36,8 @@ template <class T, class U> void log (T key, U value) {
   #endif
 }
 
-ESPDomotic _domoticModule;
+ESPDomotic  _domoticModule;
+uint8_t     _prevSwithcState = LOW;
 
 void setup() {
 #ifdef ESP01
@@ -68,16 +69,14 @@ void loop() {
 
 void processInput() {
   int read = digitalRead(_switch.pin);
-  if (read != _switch.state) {
-    log(F("Physical switch state has changed. Updating module"), _switch.name);
-    flipRelayState();
+  if (read != _prevSwithcState) {
+    log(F("Input channel state has changed"), _switch.name);
+    _prevSwithcState = read;
+    _relay.state = _relay.state == LOW ? HIGH : LOW;
+    digitalWrite(_relay.pin, _relay.state);
+    _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(&_relay, "feedback/state").c_str(), _relay.state == LOW ? "1" : "0");
+    log(F("Output channel state changeed to"), _relay.state == LOW ? "1" : "0");
   }
-}
-
-void flipRelayState() {
-  _relay.state = _relay.state == LOW ? HIGH : LOW;
-  digitalWrite(_relay.pin, _relay.state);
-  _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(&_relay, "feedback/state").c_str(), _relay.state == LOW ? "1" : "0");
 }
 
 void mqttConnectionCallback() {
