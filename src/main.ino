@@ -17,8 +17,8 @@ const uint8_t RELAY_PIN   = 5;
 const uint8_t LED_PIN     = 12;
 #endif
 
-Channel _switch ("A", "Switch", SWITCH_PIN, INPUT, LOW, -1);
-Channel _relay ("B", "Relay", RELAY_PIN, OUTPUT, HIGH, -1);
+Channel _light ("B", "Relay", RELAY_PIN, OUTPUT, HIGH);
+Channel _switch ("A", "Switch", SWITCH_PIN, INPUT, LOW, &_light);
 
 template <class T> void log (T text) {
   #ifdef LOGGING
@@ -58,7 +58,7 @@ void setup() {
   _domoticModule.setMqttMessageCallback(receiveMqttMessage);
   _domoticModule.setModuleType("light");
   _domoticModule.addChannel(&_switch);
-  _domoticModule.addChannel(&_relay);
+  _domoticModule.addChannel(&_light);
   _domoticModule.init();
 }
 
@@ -72,10 +72,10 @@ void processInput() {
   if (read != _prevSwithcState) {
     log(F("Input channel state has changed"), _switch.name);
     _prevSwithcState = read;
-    _relay.state = _relay.state == LOW ? HIGH : LOW;
-    digitalWrite(_relay.pin, _relay.state);
-    _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(&_relay, "feedback/state").c_str(), _relay.state == LOW ? "1" : "0");
-    log(F("Output channel state changeed to"), _relay.state == LOW ? "1" : "0");
+    _switch.slave->state = _switch.slave->state == LOW ? HIGH : LOW;
+    digitalWrite(_switch.slave->pin, _switch.slave->state);
+    _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(&_light, "feedback/state").c_str(), _switch.slave->state == LOW ? "1" : "0");
+    log(F("Output channel state changeed to"), _switch.slave->state == LOW ? "1" : "0");
   }
 }
 
