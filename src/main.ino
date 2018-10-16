@@ -1,17 +1,20 @@
 #include <ESPDomotic.h>
 
 #ifdef ESP01
+// usable pins GPIO2 (GPIO3 if using SERIAL_TX_ONLY)
 const uint8_t SWITCH_PIN  = 3;
 const uint8_t RELAY_PIN   = 2;
 const uint8_t TX_PIN      = 1;
 #elif NODEMCUV2
-const uint8_t SWITCH_PIN  = D1;
-const uint8_t RELAY_PIN   = D2;
-const uint8_t LED_PIN     = D3;
+// usable pins D0,D1,D2,D5,D6,D7 (D10 is TX (GPIO1), D9 is RX (GPIO3), D3 is GPIO0, D4 is GPIO2, D8 is GPIO15)
+const uint8_t SWITCH_PIN  = D0;
+const uint8_t RELAY_PIN   = D1;
+const uint8_t LED_PIN     = D7;
 #else
-const uint8_t SWITCH_PIN  = 1;
-const uint8_t RELAY_PIN   = 2;
-const uint8_t LED_PIN     = 3;
+// usable pins GPIO 4,5,12,13,14,16
+const uint8_t SWITCH_PIN  = 4;
+const uint8_t RELAY_PIN   = 5;
+const uint8_t LED_PIN     = 12;
 #endif
 
 Channel _switch ("A", "Switch", SWITCH_PIN, INPUT, HIGH, -1);
@@ -60,28 +63,21 @@ void setup() {
 
 void loop() {
   _domoticModule.loop();
-  processPhysicalInput();
+  processInput();
 }
 
-void processPhysicalInput() {
-  for (size_t i = 0; i < _domoticModule.getChannelsCount(); ++i) {
-    Channel *c = _domoticModule.getChannel(i);
-    if (c->pinMode == INPUT && c->isEnabled()) {
-      // Just process those channels that are intented to act as input. e.g. a light switch
-      processChannelInput(c);
-    }
+void processInput() {
+  int read = digitalRead(_switch.pin);
+  if (read != _switch.state) {
+    log(F("Physical switch state has changed. Updating module"), _switch.name);
+    flipRelayState();
   }
 }
 
-void processChannelInput(Channel *c) {
-  int read = digitalRead(c->pin);
-  if (read != c->state) {
-    log(F("Physical switch state has changed. Updating module"), c->name);
-    digitalWrite(c->pin, c->state = read);
-    log(F("Channel updated"), c->name);
-    log(F("State changed to"), "" + c->state);
-    _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(c, "feedback/state").c_str(), c->state == LOW ? "1" : "0");
-  }
+void flipRelayState() {
+  _relay.state = _relay.state == LOW ? HIGH : LOW;
+  digitalWrite(_relay.pin, _relay.state);
+  _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(&_relay, "feedback/state").c_str(), _relay.state == LOW ? "1" : "0");
 }
 
 void mqttConnectionCallback() {
