@@ -1,30 +1,34 @@
 #include <FS.h>
 #include <ESPDomotic.h>
 
-/* Channels on module */
-Channel _switch ("A", "Switch", 3, LOW, -1, INPUT);
-Channel _relay ("B", "Relay", 2, LOW, -1, OUTPUT);
-
 #ifdef ESP01
+Channel _switch ("A", "Switch", 3, INPUT, HIGH, -1);
+Channel _relay ("B", "Relay", 2, OUTPUT, HIGH, -1);
 const uint8_t TX_PIN      = 1;
 #elif NODEMCUV2
-const uint8_t LED_PIN     = D7;
+Channel _switch ("A", "Switch", D1, INPUT, HIGH, -1);
+Channel _relay ("B", "Relay", D2, OUTPUT, HIGH, -1);
+const uint8_t LED_PIN     = D3;
+#else
+Channel _switch ("A", "Switch", 1, INPUT, HIGH, -1);
+Channel _relay ("B", "Relay", 2, OUTPUT, HIGH, -1);
+const uint8_t LED_PIN     = 3;
 #endif
 
 template <class T> void log (T text) {
-  if (LOGGING) {
-    Serial.print("*SW: ");
-    Serial.println(text);
-  }
+  #ifdef LOGGING
+  Serial.print("*SW: ");
+  Serial.println(text);
+  #endif
 }
 
 template <class T, class U> void log (T key, U value) {
-  if (LOGGING) {
-    Serial.print("*SW: ");
-    Serial.print(key);
-    Serial.print(": ");
-    Serial.println(value);
-  }
+  #ifdef LOGGING
+  Serial.print("*SW: ");
+  Serial.print(key);
+  Serial.print(": ");
+  Serial.println(value);
+  #endif
 }
 
 ESPDomotic _domoticModule;
@@ -47,7 +51,6 @@ void setup() {
   _domoticModule.setMqttConnectionCallback(mqttConnectionCallback);
   _domoticModule.setMqttMessageCallback(receiveMqttMessage);
   _domoticModule.setModuleType("light");
-  _domoticModule.setDebugOutput(LOGGING);
   _domoticModule.addChannel(&_switch);
   _domoticModule.addChannel(&_relay);
   _domoticModule.init();
@@ -72,32 +75,17 @@ void processChannelInput(Channel *c) {
   int read = digitalRead(c->pin);
   if (read != c->state) {
     log(F("Physical switch state has changed. Updating module"), c->name);
-    c->state = read;
-    flipRelayState(c);
-    _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(c, "feedback/state").c_str(), c->state == HIGH ? "1" : "0");
+    digitalWrite(c->pin, c->state = read);
+    log(F("Channel updated"), c->name);
+    log(F("State changed to"), "" + c->state);
+    _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(c, "feedback/state").c_str(), c->state == LOW ? "1" : "0");
   }
-}
-
-void flipRelayState (Channel *c) {
-  c->state = c->state == LOW ? HIGH : LOW;
-  switch (c->state) {
-    case LOW:
-      digitalWrite(c->pin, LOW);
-      break;
-    case HIGH:
-      digitalWrite(c->pin, HIGH);
-      break;
-    default:
-      break;
-  }
-  log(F("Channel updated"), c->name);
-  log(F("State changed to"), "" + c->state);
 }
 
 void mqttConnectionCallback() {
-  // none additional subsription is needed
+  // no additional subsription is needed
 }
 
 void receiveMqttMessage(char* topic, uint8_t* payload, unsigned int length) {
-  // none additional message to process
+  // no additional message to process
 }
