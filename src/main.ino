@@ -60,7 +60,6 @@ void setup() {
   _domoticModule.addChannel(&_switch);
   _domoticModule.addChannel(&_light);
   _domoticModule.init();
-  _prevSwithcState = digitalRead(_switch.pin);
 }
 
 void loop() {
@@ -69,14 +68,19 @@ void loop() {
 }
 
 void processInput() {
-  int read = digitalRead(_switch.pin);
-  if (read != _prevSwithcState) {
-    log(F("Input channel state has changed"), _switch.name);
-    _prevSwithcState = read;
-    _switch.slave->state = _switch.slave->state == LOW ? HIGH : LOW;
-    digitalWrite(_switch.slave->pin, _switch.slave->state);
-    _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(&_light, "feedback/state").c_str(), _switch.slave->state == LOW ? "1" : "0");
-    log(F("Output channel state changeed to"), _switch.slave->state == LOW ? "1" : "0");
+  for (int i = 0; i < _domoticModule.getChannelsCount(); ++i) {
+    Channel *channel = _domoticModule.getChannel(i);
+    if (channel->pinMode == INPUT) {
+      int read = digitalRead(channel->pin);
+      if (read != channel->state) {
+        log(F("Input channel state has changed"), channel->name);
+        channel->state = read;
+        channel->slave->state = channel->slave->state == LOW ? HIGH : LOW;
+        digitalWrite(channel->slave->pin, channel->slave->state);
+        _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(channel->slave, "feedback/state").c_str(), channel->slave->state == LOW ? "1" : "0");
+        log(F("Output channel state changeed to"), channel->slave->state == LOW ? "ON" : "OFF");
+      }
+    }
   }
 }
 
