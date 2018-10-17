@@ -17,8 +17,8 @@ const uint8_t RELAY_PIN   = 5;
 const uint8_t LED_PIN     = 12;
 #endif
 
-Channel _light ("B", "Relay", RELAY_PIN, OUTPUT, HIGH);
-Channel _switch ("A", "Switch", SWITCH_PIN, INPUT, LOW, &_light);
+Channel _light ("A", "Light", RELAY_PIN, OUTPUT, HIGH);
+Channel _switch ("B", "Switch", SWITCH_PIN, INPUT, LOW, &_light);
 
 template <class T> void log (T text) {
   #ifdef LOGGING
@@ -37,7 +37,7 @@ template <class T, class U> void log (T key, U value) {
 }
 
 ESPDomotic  _domoticModule;
-uint8_t     _prevSwithcState = LOW;
+uint8_t     _prevSwithcState;
 
 void setup() {
 #ifdef ESP01
@@ -60,6 +60,7 @@ void setup() {
   _domoticModule.addChannel(&_switch);
   _domoticModule.addChannel(&_light);
   _domoticModule.init();
+  _prevSwithcState = digitalRead(_switch.pin);
 }
 
 void loop() {
