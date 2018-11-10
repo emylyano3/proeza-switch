@@ -75,10 +75,12 @@ void processInput() {
       if (read != channel->state) {
         log(F("Input channel state has changed"), channel->name);
         channel->state = read;
-        channel->slave->state = channel->slave->state == LOW ? HIGH : LOW;
-        digitalWrite(channel->slave->pin, channel->slave->state);
-        _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(channel->slave, "feedback/state").c_str(), channel->slave->state == LOW ? "1" : "0");
-        log(F("Output channel state changeed to"), channel->slave->state == LOW ? "ON" : "OFF");
+        if (channel->slave) {
+          channel->slave->state = channel->slave->state == LOW ? HIGH : LOW;
+          digitalWrite(channel->slave->pin, channel->slave->state);
+          _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(channel->slave, "feedback/state").c_str(), channel->slave->state == LOW ? "1" : "0");
+          log(F("Output channel state changeed to"), channel->slave->state == LOW ? "ON" : "OFF");
+        }
       }
     }
   }
