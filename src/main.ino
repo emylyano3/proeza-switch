@@ -2,8 +2,8 @@
 
 #ifdef ESP01
 // usable pins GPIO2 (GPIO3 if using SERIAL_TX_ONLY)
-const uint8_t SWITCH_PIN  = 3;
-const uint8_t RELAY_PIN   = 2;
+const uint8_t SWITCH_PIN  = 2;
+const uint8_t RELAY_PIN   = 0;
 const uint8_t TX_PIN      = 1;
 #elif NODEMCUV2
 // usable pins D0,D1,D2,D5,D6,D7 (D10 is TX (GPIO1), D9 is RX (GPIO3), D3 is GPIO0, D4 is GPIO2, D8 is GPIO15)
