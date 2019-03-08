@@ -56,6 +56,8 @@ void setup() {
   #endif
   _domoticModule.setMqttConnectionCallback(mqttConnectionCallback);
   _domoticModule.setMqttMessageCallback(receiveMqttMessage);
+  _domoticModule.setConfigPortalTimeout(90);
+  _domoticModule.setWifiConnectTimeout(45);
   _domoticModule.setModuleType("light");
   _domoticModule.addChannel(&_switch);
   _domoticModule.addChannel(&_light);
