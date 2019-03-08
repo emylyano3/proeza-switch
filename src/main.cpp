@@ -1,5 +1,9 @@
 #include <ESPDomotic.h>
 
+void processInput();
+void mqttConnectionCallback();
+void receiveMqttMessage(char* topic, uint8_t* payload, unsigned int length);
+
 #ifdef ESP01
 // usable pins GPIO2 (GPIO3 if using SERIAL_TX_ONLY)
 const uint8_t SWITCH_PIN  = 2;
