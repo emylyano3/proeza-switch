@@ -22,7 +22,6 @@ const uint8_t LED_PIN     = 12;
 #endif
 
 Channel _light ("A", "Light", RELAY_PIN, OUTPUT, HIGH);
-Channel _switch ("B", "Switch", SWITCH_PIN, INPUT, LOW, &_light);
 
 template <class T> void log (T text) {
   #ifdef LOGGING
@@ -41,7 +40,7 @@ template <class T, class U> void log (T key, U value) {
 }
 
 ESPDomotic  _domoticModule;
-uint8_t     _prevSwithcState;
+uint8_t     switchState = LOW;
 
 void setup() {
 #ifdef ESP01
@@ -52,6 +51,7 @@ void setup() {
 #endif
   delay(500);
   Serial.println();
+  switchState = digitalRead(SWITCH_PIN);
   log("Starting module");
   String ssid = "Light switch " + String(ESP.getChipId());
   _domoticModule.setPortalSSID(ssid.c_str());
@@ -64,7 +64,6 @@ void setup() {
   _domoticModule.setWifiConnectTimeout(45);
   _domoticModule.setConfigFileSize(256);
   _domoticModule.setModuleType("light");
-  _domoticModule.addChannel(&_switch);
   _domoticModule.addChannel(&_light);
   _domoticModule.init();
 }
@@ -75,21 +74,14 @@ void loop() {
 }
 
 void processInput() {
-  for (int i = 0; i < _domoticModule.getChannelsCount(); ++i) {
-    Channel *channel = _domoticModule.getChannel(i);
-    if (channel->pinMode == INPUT) {
-      int read = digitalRead(channel->pin);
-      if (read != channel->state) {
-        log(F("Input channel state has changed"), channel->name);
-        channel->state = read;
-        if (channel->slave) {
-          channel->slave->state = channel->slave->state == LOW ? HIGH : LOW;
-          digitalWrite(channel->slave->pin, channel->slave->state);
-          _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(channel->slave, "feedback/state").c_str(), channel->slave->state == LOW ? "1" : "0");
-          log(F("Output channel state changeed to"), channel->slave->state == LOW ? "ON" : "OFF");
-        }
-      }
-    }
+  int read = digitalRead(SWITCH_PIN);
+  if (read != switchState) {
+    log(F("Switch state has changed"));
+    switchState = read;
+    _light.state = _light.state == LOW ? HIGH : LOW;
+    digitalWrite(_light.pin, _light.state);
+    _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(&_light, "feedback/state").c_str(), _light.state == LOW ? "1" : "0");
+    log(F("Output channel state changed to"), _light.state == LOW ? "ON" : "OFF");
   }
 }
 
