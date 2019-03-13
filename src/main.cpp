@@ -40,7 +40,7 @@ template <class T, class U> void log (T key, U value) {
 }
 
 ESPDomotic  _domoticModule;
-uint8_t     switchState = LOW;
+uint8_t     _switchState = LOW;
 
 void setup() {
 #ifdef ESP01
@@ -51,7 +51,7 @@ void setup() {
 #endif
   delay(500);
   Serial.println();
-  switchState = digitalRead(SWITCH_PIN);
+  _switchState = digitalRead(SWITCH_PIN);
   log("Starting module");
   String ssid = "Light switch " + String(ESP.getChipId());
   _domoticModule.setPortalSSID(ssid.c_str());
@@ -75,9 +75,9 @@ void loop() {
 
 void processInput() {
   int read = digitalRead(SWITCH_PIN);
-  if (read != switchState) {
+  if (read != _switchState) {
     log(F("Switch state has changed"));
-    switchState = read;
+    _switchState = read;
     _light.state = _light.state == LOW ? HIGH : LOW;
     digitalWrite(_light.pin, _light.state);
     _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(&_light, "feedback/state").c_str(), _light.state == LOW ? "1" : "0");
