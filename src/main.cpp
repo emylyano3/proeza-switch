@@ -51,8 +51,7 @@ void setup() {
   _domoticModule.setWifiConnectTimeout(45);
   _domoticModule.setConfigFileSize(256);
   _domoticModule.setModuleType("switch");
-  _domoticModule.setFirmwareVersion("v0.1");
-  _domoticModule.setFirmwareName("homie");
+  _domoticModule.setFirmware("homiev3", "v0.1");
   _domoticModule.addChannel(&_light);
   _domoticModule.init();
 }
