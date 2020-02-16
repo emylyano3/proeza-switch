@@ -5,9 +5,10 @@ void mqttConnectionCallback();
 void receiveMqttMessage(char* topic, uint8_t* payload, unsigned int length);
 
 #ifdef ESP01
-// usable pins GPIO2 (GPIO3 if using SERIAL_TX_ONLY)
-const uint8_t SWITCH_PIN  = 2;
-const uint8_t RELAY_PIN   = 0;
+// usable pins are GPIO2 and GPIO as output (both must be pulled up to boot normal )
+// If using SERIAL_TX_ONLY over GPIO1, GPIO3 becomes available
+const uint8_t SWITCH_PIN  = 3;
+const uint8_t RELAY_PIN   = 2;
 const uint8_t TX_PIN      = 1;
 #elif NODEMCUV2
 // usable pins D0,D1,D2,D5,D6,D7 (D10 is TX (GPIO1), D9 is RX (GPIO3), D3 is GPIO0, D4 is GPIO2, D8 is GPIO15)
@@ -51,6 +52,7 @@ void setup() {
 #endif
   delay(500);
   Serial.println();
+  pinMode(SWITCH_PIN, INPUT_PULLUP);
   _switchState = digitalRead(SWITCH_PIN);
   log("Starting module");
   String ssid = "Light switch " + String(ESP.getChipId());
