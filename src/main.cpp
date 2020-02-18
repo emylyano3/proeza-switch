@@ -62,10 +62,10 @@ void setup() {
   #endif
   _domoticModule.setMqttConnectionCallback(mqttConnectionCallback);
   _domoticModule.setMqttMessageCallback(receiveMqttMessage);
-  _domoticModule.setConfigPortalTimeout(90);
-  _domoticModule.setWifiConnectTimeout(45);
-  _domoticModule.setConfigFileSize(256);
-  _domoticModule.setModuleType("light-switch");
+  _domoticModule.setConfigPortalTimeout(CONFIG_PORTAL_TIMEOUT);
+  _domoticModule.setWifiConnectTimeout(WIFI_CONNECT_TIMEOUT);
+  _domoticModule.setConfigFileSize(CONFIG_FILE_SIZE);
+  _domoticModule.setModuleType("switch");
   _domoticModule.addChannel(&_light);
   _domoticModule.init();
 }
