@@ -58,7 +58,7 @@ void setup() {
   String ssid = "Light switch " + String(ESP.getChipId());
   _domoticModule.setPortalSSID(ssid.c_str());
   #ifndef ESP01
-  _domoticModule.setFeedbackPin(LED_PIN);
+  _domoticModule.setFeedbackPin(LED_PIN); // PIN 0 can be used as output
   #endif
   _domoticModule.setMqttConnectionCallback(mqttConnectionCallback);
   _domoticModule.setMqttMessageCallback(receiveMqttMessage);
