@@ -1,6 +1,8 @@
 #include <ESPDomotic.h>
 
 void processInput();
+void checkInputChainLength();
+void buildInputChain();
 void mqttConnectionCallback();
 void receiveMqttMessage(char* topic, uint8_t* payload, unsigned int length);
 
@@ -23,6 +25,9 @@ const uint8_t LED_PIN     = 12;
 #endif
 
 Channel _light ("A", "Light", RELAY_PIN, OUTPUT, HIGH);
+
+unsigned long lastInputTs       = 0;
+unsigned int  inputChainLength  = 0;
 
 template <class T> void log (T text) {
   #ifdef LOGGING
@@ -77,13 +82,40 @@ void loop() {
 
 void processInput() {
   int read = digitalRead(SWITCH_PIN);
+  checkInputChainLength();
   if (read != _switchState) {
     log(F("Switch state has changed"));
+    buildInputChain();
     _switchState = read;
     _light.state = _light.state == LOW ? HIGH : LOW;
     digitalWrite(_light.pin, _light.state);
     _domoticModule.getMqttClient()->publish(_domoticModule.getChannelTopic(&_light, "feedback/state").c_str(), _light.state == LOW ? "1" : "0");
     log(F("Output channel state changed to"), _light.state == LOW ? "ON" : "OFF");
+  }
+}
+
+void buildInputChain() {
+  if ((lastInputTs + INPUT_CHAIN_THRESHOLD) > millis()) {
+    ++inputChainLength;
+    log(F("Input chain length"), inputChainLength);
+  } 
+  lastInputTs = millis();
+}
+
+void checkInputChainLength() {
+  if (inputChainLength != 0 && (lastInputTs + INPUT_CHAIN_THRESHOLD) < millis()) {
+    switch (inputChainLength) {
+      case 9:
+        log(F("Doing a hard reset"));
+        //_domoticModule.moduleHardReset();
+      case 4:
+        log(F("Doing a soft reset"));
+        _domoticModule.moduleSoftReset();
+      default:
+        log(F("Reseting input chain"));
+        inputChainLength = 0;
+        break;
+    }
   }
 }
 
